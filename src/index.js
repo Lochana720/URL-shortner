@@ -37,7 +37,44 @@ async function handleShorten(request, env, corsHeaders) {
       );
     }
 
-    return jsonResponse({ shortCode: "ABC123" }, 200, corsHeaders);
+    const supabaseUrl = env.SUPABASE_URL;
+    const supabaseAnonKey = env.SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return jsonResponse(
+        { error: "Server misconfiguration. Supabase env vars are required." },
+        500,
+        corsHeaders
+      );
+    }
+
+    const shortCode = generateShortCode(6);
+    const insertEndpoint = `${supabaseUrl.replace(/\/$/, "")}/rest/v1/urls`;
+
+    const supabaseResponse = await fetch(insertEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        short_code: shortCode,
+        long_url: longUrl,
+      }),
+    });
+
+    if (!supabaseResponse.ok) {
+      const errorBody = await supabaseResponse.json().catch(() => ({}));
+      return jsonResponse(
+        { error: errorBody?.message || "Failed to save URL in Supabase." },
+        502,
+        corsHeaders
+      );
+    }
+
+    return jsonResponse({ shortCode }, 200, corsHeaders);
   } catch (error) {
     return jsonResponse(
       { error: "Internal server error.", details: error.message },
@@ -45,6 +82,17 @@ async function handleShorten(request, env, corsHeaders) {
       corsHeaders
     );
   }
+}
+
+// Helper to generate a random alphanumeric short code
+function generateShortCode(length) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  for (let i = 0; i < length; i += 1) {
+    const randomIndex = Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / (0xffffffff + 1) * chars.length);
+    result += chars[randomIndex];
+  }
+  return result;
 }
 
 // Helper to return JSON responses with CORS headers
