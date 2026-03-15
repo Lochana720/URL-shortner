@@ -19,6 +19,15 @@ export default {
       return handleShorten(request, env, corsHeaders);
     }
 
+    // Handle GET /:shortCode to resolve and redirect.
+    if (request.method === "GET") {
+      const pathSegments = url.pathname.split("/").filter(Boolean);
+      if (pathSegments.length === 1 && pathSegments[0] !== "shorten") {
+        const shortCode = decodeURIComponent(pathSegments[0]);
+        return handleResolveShortCode(shortCode, env, corsHeaders);
+      }
+    }
+
     return jsonResponse({ error: "Not found." }, 404, corsHeaders);
   },
 };
@@ -93,6 +102,62 @@ function generateShortCode(length) {
     result += chars[randomIndex];
   }
   return result;
+}
+
+// Handle lookup and redirect for GET /:shortCode.
+async function handleResolveShortCode(shortCode, env, corsHeaders) {
+  try {
+    if (!shortCode || shortCode.length === 0) {
+      return jsonResponse({ error: "Not found." }, 404, corsHeaders);
+    }
+
+    const supabaseUrl = env.SUPABASE_URL;
+    const supabaseAnonKey = env.SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return jsonResponse(
+        { error: "Server misconfiguration. Supabase env vars are required." },
+        500,
+        corsHeaders
+      );
+    }
+
+    const queryEndpoint = `${supabaseUrl.replace(/\/$/, "")}/rest/v1/urls?select=long_url&short_code=eq.${encodeURIComponent(shortCode)}&limit=1`;
+
+    const supabaseResponse = await fetch(queryEndpoint, {
+      method: "GET",
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!supabaseResponse.ok) {
+      return jsonResponse({ error: "Failed to look up short URL." }, 502, corsHeaders);
+    }
+
+    const rows = await supabaseResponse.json();
+
+    if (!Array.isArray(rows) || rows.length === 0 || !rows[0]?.long_url) {
+      return jsonResponse({ error: "Short code not found." }, 404, corsHeaders);
+    }
+
+    const destinationUrl = rows[0].long_url;
+    return new Response(null, {
+      status: 301,
+      headers: {
+        Location: destinationUrl,
+        ...corsHeaders,
+      },
+    });
+  } catch (error) {
+    return jsonResponse(
+      { error: "Internal server error.", details: error.message },
+      500,
+      corsHeaders
+    );
+  }
 }
 
 // Helper to return JSON responses with CORS headers
