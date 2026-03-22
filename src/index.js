@@ -46,6 +46,17 @@ async function handleShorten(request, env, corsHeaders) {
       );
     }
 
+    // Validate that longUrl is a syntactically valid URL
+    try {
+      new URL(longUrl);
+    } catch {
+      return jsonResponse(
+        { error: "Invalid URL format for 'longUrl'." },
+        400,
+        corsHeaders
+      );
+    }
+
     const supabaseUrl = env.SUPABASE_URL;
     const supabaseAnonKey = env.SUPABASE_ANON_KEY;
 
@@ -75,12 +86,19 @@ async function handleShorten(request, env, corsHeaders) {
     });
 
     if (!supabaseResponse.ok) {
-      const errorBody = await supabaseResponse.json().catch(() => ({}));
-      return jsonResponse(
-        { error: errorBody?.message || "Failed to save URL in Supabase." },
-        502,
-        corsHeaders
-      );
+      let supabaseErrorMessage = "Failed to save URL in Supabase.";
+      try {
+        const errorBody = await supabaseResponse.json();
+        supabaseErrorMessage =
+          errorBody?.message ||
+          errorBody?.error_description ||
+          errorBody?.hint ||
+          JSON.stringify(errorBody);
+      } catch {
+        const errorText = await supabaseResponse.text();
+        if (errorText) supabaseErrorMessage = errorText;
+      }
+      return jsonResponse({ error: supabaseErrorMessage }, 502, corsHeaders);
     }
 
     return jsonResponse({ shortCode }, 200, corsHeaders);
