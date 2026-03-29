@@ -6,6 +6,8 @@ export default {
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
       "Content-Type": "application/json",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
     };
 
     if (request.method === "OPTIONS") {
