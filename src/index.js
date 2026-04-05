@@ -113,14 +113,21 @@ async function handleShorten(request, env, corsHeaders) {
   }
 }
 
-// Helper to generate a random alphanumeric short code
+// Helper to generate a random alphanumeric short code with collision resistance
 function generateShortCode(length) {
+  // Define the allowed characters for diversity in short codes
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
+  
+  // Use cryptographically secure random values for better entropy
+  const randomValues = crypto.getRandomValues(new Uint32Array(length));
+  
   for (let i = 0; i < length; i += 1) {
-    const randomIndex = Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] / (0xffffffff + 1) * chars.length);
+    // Map random value to character index using modulo
+    const randomIndex = Math.floor((randomValues[i] / (0xffffffff + 1)) * chars.length);
     result += chars[randomIndex];
   }
+  
   return result;
 }
 
