@@ -51,17 +51,53 @@
       const form = document.getElementById("shortenForm");
       const input = document.getElementById("longUrl");
       const result = document.getElementById("result");
+      const submitBtn = form.querySelector("button");
+
+      const workerEndpoint = "https://url-shortener.yourname.workers.dev/shorten";
+      const baseShortUrl = "https://url-shortener.yourname.workers.dev";
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const longUrl = input.value.trim();
         
         if (!longUrl) {
-          result.innerHTML = "<div>Please enter a long URL first.</div>";
+          result.innerHTML = "<div style='color: #b91c1c;'>Please enter a long URL first.</div>";
           return;
         }
 
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Shortening...";
         result.innerHTML = "<div>Creating your short link...</div>";
+
+        try {
+          const response = await fetch(workerEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ longUrl }),
+          });
+
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            throw new Error(data.error || "Unable to shorten the URL.");
+          }
+
+          const shortCode = data.shortCode;
+          if (!shortCode) throw new Error("No short code returned.");
+
+          const shortUrl = `${baseShortUrl}/${shortCode}`;
+          result.innerHTML = `
+            <div style='color: #0f766e;'>
+              <div style='font-size: 0.8rem; text-transform: uppercase; color: #64748b; margin-bottom: 8px;'>Short URL</div>
+              <div style='font-size: 1.1rem; font-weight: 700; word-break: break-all;'><a href="${shortUrl}" target="_blank" rel="noreferrer">${shortUrl}</a></div>
+            </div>
+          `;
+        } catch (error) {
+          result.innerHTML = `<div style='color: #b91c1c;'>${error instanceof Error ? error.message : "Something went wrong."}</div>`;
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Shorten";
+        }
       });
     </script>
   </body>
