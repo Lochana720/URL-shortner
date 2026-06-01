@@ -16,6 +16,23 @@ export default {
 
     const url = new URL(request.url);
 
+    // Serve a small landing response at the root path so GET / does not return 404.
+    if (request.method === "GET" && url.pathname === "/") {
+      return new Response(
+        JSON.stringify({
+          message: "URL shortener Worker is running.",
+          routes: {
+            shorten: "POST /shorten",
+            redirect: "GET /:shortCode",
+          },
+        }),
+        {
+          status: 200,
+          headers: corsHeaders,
+        }
+      );
+    }
+
     // Handle POST /shorten for creating short codes
     if (request.method === "POST" && url.pathname === "/shorten") {
       return handleShorten(request, env, corsHeaders);
